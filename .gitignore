@@ -1,0 +1,4 @@
+.DS_Store
+template-packaged.yml
+.aws-sam/*
+

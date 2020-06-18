@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Globals:
+  Api:
+    Cors:
+      AllowHeaders: "'Content-Type, x-requested-with'"
+      AllowOrigin: "'http://my-bucket-name.s3-website.eu-central-1.amazonaws.com'"
+      AllowMethods: "'POST'"      
+
+Resources:
+  RequestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.lambdaHandler
+      Runtime: nodejs12.x
+      CodeUri: .
+      Timeout: 10
+      MemorySize: 1024
+      Environment:
+        Variables:          
+          NEW_CONTACT_TOPIC: !Ref NewRequestTopic
+      Events:
+        PostAPI:
+          Type: Api
+          Properties:
+            Path: /request
+            Method: post
+      Policies:
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource:  !Ref NewRequestTopic
+  NewRequestQueue: 
+    Type: AWS::SQS::Queue
+  
+  NewRequestTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+      - Endpoint: !Ref SNSEmailAddress
+        Protocol: email
+      - Endpoint: !GetAtt NewRequestQueue.Arn
+        Protocol: sqs
+  
+  AllowSNS2SQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Id: PublicationPolicy
+        Statement:
+        - Action: ['sqs:SendMessage']
+          Condition:
+            ArnEquals:
+              aws:SourceArn: !Ref NewRequestTopic
+          Effect: Allow
+          Principal: {AWS: '*'}
+          Resource: !GetAtt NewRequestQueue.Arn            
+          Sid: Allow-SNS-SendMessage
+        Version: '2008-10-17'
+      Queues:
+      - !Ref NewRequestQueue
+
+Parameters:
+  SNSEmailAddress:
+    Type: String      
+
+Outputs:
+  Endpoint:
+    Value: !Join ["", [
+      "https://",
+      !Ref ServerlessRestApi,
+      ".execute-api.",
+      !Ref "AWS::Region",
+      ".amazonaws.com/",
+      !Ref ServerlessRestApiProdStage
+    ]]      

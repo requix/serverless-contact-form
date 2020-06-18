@@ -1,0 +1,18 @@
+{
+  "name": "AWS-Lambda-Sample-App",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "aws-sdk": "latest"
+  },
+  "scripts": {
+    "start": "sam local start-api",
+    "static": "aws s3 sync ./static s3://my-bucket-name --acl public-read",
+    "logs": "sam logs -n RequestFunction --stack-name serverless-contact-request --tail",
+    "sam-package": "sam package --template-file template.yml --s3-bucket my-bucket-name-packages --output-template-file template-packaged.yml --region eu-central-1",
+    "sam-deploy": "sam deploy --template-file template-packaged.yml --stack-name serverless-contact-request --capabilities CAPABILITY_IAM --region eu-central-1 --parameter-overrides SNSEmailAddress=test@example.com",
+    "deploy": "npm run sam-package; npm run sam-deploy;",
+    "endpoint": "aws cloudformation describe-stacks --stack-name serverless-contact-request --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text",
+    "destroy": "aws cloudformation delete-stack --stack-name serverless-contact-request"
+  }
+}
