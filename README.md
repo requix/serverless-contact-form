@@ -9,6 +9,10 @@ API endpoint build with AWS API Gateway and AWS Lambda. Static site hosted on AW
 2. [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
 3.  npm
 
+## Configuration
+
+Edit config section in package.json
+
 ## How to deploy
 
 1. `npm install`
