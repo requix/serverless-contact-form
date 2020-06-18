@@ -1,18 +1,30 @@
 {
   "name": "AWS-Lambda-Sample-App",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "devDependencies": {
-    "aws-sdk": "latest"
+    "aws-sdk": "latest",
+    "cross-var": "latest"
+  },
+  "config": {
+    "region": "eu-central-1",
+    "s3BucketName": "insert destination bucket name",
+    "snsEmailAddress": "insert email address for SNS notifications",
+    "template": "./template.yaml",
+    "stackName": "serverless-contact-form"
   },
   "scripts": {
     "start": "sam local start-api",
-    "static": "aws s3 sync ./static s3://my-bucket-name --acl public-read",
-    "logs": "sam logs -n RequestFunction --stack-name serverless-contact-request --tail",
-    "sam-package": "sam package --template-file template.yml --s3-bucket my-bucket-name-packages --output-template-file template-packaged.yml --region eu-central-1",
-    "sam-deploy": "sam deploy --template-file template-packaged.yml --stack-name serverless-contact-request --capabilities CAPABILITY_IAM --region eu-central-1 --parameter-overrides SNSEmailAddress=test@example.com",
-    "deploy": "npm run sam-package; npm run sam-deploy;",
-    "endpoint": "aws cloudformation describe-stacks --stack-name serverless-contact-request --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text",
-    "destroy": "aws cloudformation delete-stack --stack-name serverless-contact-request"
+    "create-bucket": "cross-var aws s3 mb s3://$npm_package_config_s3BucketName --region $npm_package_config_region",
+    "website-s3": "cross-var aws s3 website s3://$npm_package_config_s3BucketName --index-document index.html",
+    "sync-static": "cross-var aws s3 sync ./static s3://$npm_package_config_s3BucketName --acl public-read",
+    "deploy-static": "npm run website-s3; npm run sync-static",
+    "logs": "cross-var sam logs -n RequestFunction --stack-name $npm_package_config_stackName --tail",
+    "sam-package": "cross-var sam package --template-file template.yml --s3-bucket $npm_package_config_s3BucketName --output-template-file template-packaged.yml --region $npm_package_config_region",
+    "sam-deploy": "cross-var sam deploy --template-file template-packaged.yml --stack-name $npm_package_config_stackName --capabilities CAPABILITY_IAM --region $npm_package_config_region --parameter-overrides SNSEmailAddress=$npm_package_config_snsEmailAddress S3BucketName=$npm_package_config_s3BucketName",
+    "deploy-api": "npm run sam-package; npm run sam-deploy;",
+    "deploy": "npm run deploy-api; npm run deploy-static",
+    "endpoint": "cross-var aws cloudformation describe-stacks --stack-name $npm_package_config_stackName --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text",
+    "destroy": "cross-var aws cloudformation delete-stack --stack-name $npm_package_config_stackName"
   }
 }

@@ -5,7 +5,7 @@ Globals:
   Api:
     Cors:
       AllowHeaders: "'Content-Type, x-requested-with'"
-      AllowOrigin: "'http://my-bucket-name.s3-website.eu-central-1.amazonaws.com'"
+      AllowOrigin: !Join ["", ["'http://", !Ref S3BucketName, ".s3-website.", !Ref "AWS::Region", ".amazonaws.com'"]]
       AllowMethods: "'POST'"      
 
 Resources:
@@ -66,6 +66,8 @@ Resources:
 
 Parameters:
   SNSEmailAddress:
+    Type: String
+  S3BucketName:
     Type: String      
 
 Outputs:
