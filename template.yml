@@ -20,6 +20,7 @@ Resources:
       Environment:
         Variables:          
           NEW_CONTACT_TOPIC: !Ref NewRequestTopic
+          STORAGE_BUCKET_NAME: !Ref S3RequestStorage
       Events:
         PostAPI:
           Type: Api
@@ -27,13 +28,19 @@ Resources:
             Path: /request
             Method: post
       Policies:
-        - AWSLambdaExecute
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - sns:Publish
-              Resource:  !Ref NewRequestTopic
+      - S3CrudPolicy:
+          BucketName: !Ref S3RequestStorage
+      - AWSLambdaExecute
+      - Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource:  !Ref NewRequestTopic
+      
+  S3RequestStorage:
+    Type: AWS::S3::Bucket
+    
   NewRequestQueue: 
     Type: AWS::SQS::Queue
   
@@ -71,6 +78,9 @@ Parameters:
     Type: String      
 
 Outputs:
+  S3Bucket:
+    Value: !Ref S3RequestStorage
+    Description: The S3 Bucket to store contact request
   Endpoint:
     Value: !Join ["", [
       "https://",
@@ -79,4 +89,4 @@ Outputs:
       !Ref "AWS::Region",
       ".amazonaws.com/",
       !Ref ServerlessRestApiProdStage
-    ]]      
+    ]]
