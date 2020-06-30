@@ -21,6 +21,7 @@ Resources:
         Variables:          
           NEW_CONTACT_TOPIC: !Ref NewRequestTopic
           STORAGE_BUCKET_NAME: !Ref S3RequestStorage
+          STORAGE_DYNAMODB_TABLE: !Ref DynamoDbRequestTable
       Events:
         PostAPI:
           Type: Api
@@ -37,9 +38,27 @@ Resources:
             Action:
               - sns:Publish
             Resource:  !Ref NewRequestTopic
+
+      - Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+            Resource: !GetAtt DynamoDbRequestTable.Arn
+
       
   S3RequestStorage:
     Type: AWS::S3::Bucket
+
+  DynamoDbRequestTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: email
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
     
   NewRequestQueue: 
     Type: AWS::SQS::Queue

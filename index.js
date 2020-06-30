@@ -4,8 +4,10 @@ var AWS = require('aws-sdk');
 AWS.config.region = process.env.REGION;
 
 var sns = new AWS.SNS();
-
 var snsTopic = process.env.NEW_CONTACT_TOPIC;
+
+var ddb = new AWS.DynamoDB();
+var ddbTable =  process.env.STORAGE_DYNAMODB_TABLE;
 
 const s3 = new AWS.S3();
 const STORAGE_BUCKET_NAME = process.env.STORAGE_BUCKET_NAME;
@@ -39,7 +41,7 @@ saveToS3 = (data, id) => {
 
 exports.lambdaHandler = async (event, context) => {
     const body = JSON.parse(event.body);    
-    console.log("Parsed body", body);
+    const message = 'Name: ' + body.name + "\r\nEmail: " + body.email;
 
     try {
         await saveToS3(message, context.awsRequestId).promise();
@@ -51,7 +53,7 @@ exports.lambdaHandler = async (event, context) => {
 
     try {
         await sns.publish({
-            'Message': 'Name: ' + body.name + "\r\nEmail: " + body.email,                                
+            'Message':message,
             'Subject': 'New Contact request!',
             'TopicArn': snsTopic
         }).promise();
@@ -59,6 +61,27 @@ exports.lambdaHandler = async (event, context) => {
     } catch (err) {
         console.log("SNS Error: ", err);
         return httpResponse(500, "KO");
+    }
+
+    var item = {
+        'email': {'S': body.email},
+        'name': {'S': body.name}
+    };
+
+    try {
+        await ddb.putItem({
+            'TableName': ddbTable,
+            'Item': item,
+            'Expected': { email: { Exists: false } }
+        }).promise();
+        console.log("Item written into Dynamo DB");
+    } catch (err) {
+        console.log("Dynamo DB Error: ", err);
+        var returnStatus = 500;
+        if (err.code === 'ConditionalCheckFailedException') {
+            returnStatus = 409;
+        }
+        return httpResponse(returnStatus, "KO");
     }
 
     return httpResponse(200, "OK");
