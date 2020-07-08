@@ -1,13 +1,9 @@
 const redis = require('ioredis');
 const client = new redis.Cluster([{host: process.env.ELASTICACHE_ENDPOINT,
-                                         port: process.env.ELASTICACHE_PORT}]);
+                                   port: process.env.ELASTICACHE_PORT}]);
 
 const { promisify } = require('util');
-const setAsync = promisify(client.set).bind(client);
 const getAsync = promisify(client.get).bind(client);
-const incrAsync = promisify(client.incr).bind(client);
-
-
 
 const buildResponse = (statusCode, message) => {
 
