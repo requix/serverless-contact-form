@@ -1,17 +1,17 @@
 {
-  "name": "AWS-Lambda-Sample-App",
-  "version": "0.0.2",
+  "name": "new-request-lambda",
+  "version": "0.0.4",
   "private": true,
-  "devDependencies": {
+  "dependencies": {
     "aws-sdk": "latest",
-    "cross-var": "latest"
+    "cross-var": "^1.1.0"
   },
   "config": {
     "region": "eu-central-1",
-    "s3BucketName": "insert destination bucket name",
-    "snsEmailAddress": "insert email address for SNS notifications",
-    "template": "./template.yaml",
-    "stackName": "serverless-contact-form"
+    "s3BucketName": "paste-your-S3-bucket-for-static-site",
+    "snsEmailAddress": "paste-email-for-notifications@example.com",
+    "template": "../template.yaml",
+    "stackName": "serverless-contact-request-new"
   },
   "scripts": {
     "start": "sam local start-api",
@@ -20,8 +20,8 @@
     "sync-static": "cross-var aws s3 sync ./static s3://$npm_package_config_s3BucketName --acl public-read",
     "deploy-static": "npm run website-s3; npm run sync-static",
     "logs": "cross-var sam logs -n RequestFunction --stack-name $npm_package_config_stackName --tail",
-    "sam-package": "cross-var sam package --template-file template.yml --s3-bucket $npm_package_config_s3BucketName --output-template-file template-packaged.yml --region $npm_package_config_region",
-    "sam-deploy": "cross-var sam deploy --template-file template-packaged.yml --stack-name $npm_package_config_stackName --capabilities CAPABILITY_IAM --region $npm_package_config_region --parameter-overrides SNSEmailAddress=$npm_package_config_snsEmailAddress S3BucketName=$npm_package_config_s3BucketName",
+    "sam-package": "cross-var sam package --template-file ../template.yml --s3-bucket $npm_package_config_s3BucketName --output-template-file ../template-packaged.yml --region $npm_package_config_region",
+    "sam-deploy": "cross-var sam deploy --template-file ../template-packaged.yml --stack-name $npm_package_config_stackName --capabilities CAPABILITY_IAM --region $npm_package_config_region --parameter-overrides SNSEmailAddress=$npm_package_config_snsEmailAddress S3BucketName=$npm_package_config_s3BucketName",
     "deploy-api": "npm run sam-package; npm run sam-deploy;",
     "deploy": "npm run deploy-api; npm run deploy-static",
     "endpoint": "cross-var aws cloudformation describe-stacks --stack-name $npm_package_config_stackName --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text",

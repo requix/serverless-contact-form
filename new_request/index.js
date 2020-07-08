@@ -43,6 +43,7 @@ exports.lambdaHandler = async (event, context) => {
     const body = JSON.parse(event.body);    
     const message = 'Name: ' + body.name + "\r\nEmail: " + body.email;
 
+    // save data to S3
     try {
         await saveToS3(message, context.awsRequestId).promise();
         console.log("Data saved to S3 bucket");
@@ -50,7 +51,8 @@ exports.lambdaHandler = async (event, context) => {
         console.log("S3 Error: ", err);
         return httpResponse(500, "KO");
     }
-
+    
+    // publish data to SNS topic
     try {
         await sns.publish({
             'Message':message,
@@ -63,6 +65,7 @@ exports.lambdaHandler = async (event, context) => {
         return httpResponse(500, "KO");
     }
 
+    // save data to DynamoDB table
     var item = {
         'email': {'S': body.email},
         'name': {'S': body.name}

@@ -1,0 +1,9 @@
+{
+  "name": "lambda-counter-reset",
+  "version": "0.0.3",
+  "private": true,
+  "dependencies": {
+    "ioredis": "latest",
+    "util": "latest"
+  }
+}

@@ -1,6 +1,6 @@
 .DS_Store
 template-packaged.yml
 .aws-sam/*
-node_modules/*
+node_modules/
 package-lock.json
 
