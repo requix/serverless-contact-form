@@ -3,4 +3,5 @@ template-packaged.yml
 .aws-sam/*
 node_modules/
 package-lock.json
+samconfig.toml
 
