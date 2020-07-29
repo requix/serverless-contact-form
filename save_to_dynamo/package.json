@@ -1,0 +1,8 @@
+{
+  "name": "lambda-send-to-dynamo",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "aws-sdk": "latest"   
+  }  
+}

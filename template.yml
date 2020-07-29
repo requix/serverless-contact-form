@@ -19,9 +19,7 @@ Resources:
       MemorySize: 1024
       Environment:
         Variables:          
-          NEW_CONTACT_TOPIC: !Ref NewRequestTopic
-          STORAGE_BUCKET_NAME: !Ref S3RequestStorage
-          STORAGE_DYNAMODB_TABLE: !Ref DynamoDbRequestTable          
+          NEW_CONTACT_TOPIC: !Ref NewRequestTopic          
       Events:
         PostAPI:
           Type: Api
@@ -38,13 +36,52 @@ Resources:
             Action:
               - sns:Publish
             Resource:  !Ref NewRequestTopic
+  
+  SaveToS3Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.lambdaHandler
+      Runtime: nodejs12.x
+      CodeUri: ./save_to_s3
+      Timeout: 5
+      MemorySize: 1024
+      Environment:
+        Variables:                    
+          STORAGE_BUCKET_NAME: !Ref S3RequestStorage
+      Events:
+        SnsMessage:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SaveToS3Queue.Arn
+            BatchSize: 10      
+      Policies:
+      - S3CrudPolicy:
+          BucketName: !Ref S3RequestStorage
 
+  SaveToDynamoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.lambdaHandler
+      Runtime: nodejs12.x
+      CodeUri: ./save_to_dynamo
+      Timeout: 5
+      MemorySize: 1024
+      Environment:
+        Variables:                    
+          STORAGE_DYNAMODB_TABLE: !Ref DynamoDbRequestTable
+      Events:
+        SnsMessage:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SaveToDynamoQueue.Arn
+            BatchSize: 10      
+      Policies:
       - Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Action:
               - dynamodb:PutItem
-            Resource: !GetAtt DynamoDbRequestTable.Arn 
+            Resource: !GetAtt DynamoDbRequestTable.Arn
 
   CounterAddFunction:
     Type: AWS::Serverless::Function
@@ -54,10 +91,10 @@ Resources:
       CodeUri: ./counter_add
       Timeout: 5
       MemorySize: 1024
-      Environment:
-        Variables:                            
-          ELASTICACHE_ENDPOINT: !GetAtt RedisCluster.ConfigurationEndPoint.Address
-          ELASTICACHE_PORT: !GetAtt RedisCluster.ConfigurationEndPoint.Port      
+      # Environment:
+      #   Variables:                            
+      #     ELASTICACHE_ENDPOINT: !GetAtt RedisCluster.ConfigurationEndPoint.Address
+      #     ELASTICACHE_PORT: !GetAtt RedisCluster.ConfigurationEndPoint.Port      
       Events:
         SnsMessage:
           Type: SNS
@@ -80,10 +117,10 @@ Resources:
       CodeUri: ./counter_view
       Timeout: 5
       MemorySize: 1024
-      Environment:
-        Variables:                            
-          ELASTICACHE_ENDPOINT: !GetAtt RedisCluster.ConfigurationEndPoint.Address
-          ELASTICACHE_PORT: !GetAtt RedisCluster.ConfigurationEndPoint.Port      
+      # Environment:
+      #   Variables:                            
+      #     ELASTICACHE_ENDPOINT: !GetAtt RedisCluster.ConfigurationEndPoint.Address
+      #     ELASTICACHE_PORT: !GetAtt RedisCluster.ConfigurationEndPoint.Port      
       Events:
         CounterViewAPI:
           Type: Api
@@ -107,10 +144,10 @@ Resources:
       CodeUri: ./counter_reset
       Timeout: 5
       MemorySize: 1024
-      Environment:
-        Variables:                            
-          ELASTICACHE_ENDPOINT: !GetAtt RedisCluster.ConfigurationEndPoint.Address
-          ELASTICACHE_PORT: !GetAtt RedisCluster.ConfigurationEndPoint.Port      
+      # Environment:
+      #   Variables:                            
+      #     ELASTICACHE_ENDPOINT: !GetAtt RedisCluster.ConfigurationEndPoint.Address
+      #     ELASTICACHE_PORT: !GetAtt RedisCluster.ConfigurationEndPoint.Port      
       Events:
         ResetBySchedule:
           Type: Schedule
@@ -146,20 +183,37 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
-    
-  NewRequestQueue: 
-    Type: AWS::SQS::Queue
-  
+
   NewRequestTopic:
     Type: AWS::SNS::Topic
     Properties:
       Subscription:
       - Endpoint: !Ref SNSEmailAddress
-        Protocol: email
-      - Endpoint: !GetAtt NewRequestQueue.Arn
-        Protocol: sqs
+        Protocol: email      
       - Endpoint: !GetAtt CounterAddFunction.Arn
         Protocol: lambda
+    
+  SaveToS3Queue:
+    Type: AWS::SQS::Queue
+
+  SaveToDynamoQueue:
+    Type: AWS::SQS::Queue
+  
+  SubscriptionForSaveToS3Queue:
+    Type: AWS::SNS::Subscription
+    Properties:      
+      Endpoint: !GetAtt SaveToS3Queue.Arn      
+      Protocol: sqs
+      RawMessageDelivery: true
+      TopicArn: !Ref NewRequestTopic
+
+  SubscriptionForSaveToDynamoQueue:
+    Type: AWS::SNS::Subscription
+    Properties:      
+      Endpoint: !GetAtt SaveToDynamoQueue.Arn      
+      Protocol: sqs
+      RawMessageDelivery: true
+      TopicArn: !Ref NewRequestTopic
           
   AllowSNS2SQSPolicy:
     Type: AWS::SQS::QueuePolicy
@@ -167,36 +221,46 @@ Resources:
       PolicyDocument:
         Id: PublicationPolicy
         Statement:
-        - Action: ['sqs:SendMessage']
+        - Sid: Allow-SNS-To-SaveToS3Queue
+          Effect: Allow
+          Action: ['sqs:SendMessage']
           Condition:
             ArnEquals:
               aws:SourceArn: !Ref NewRequestTopic
-          Effect: Allow
           Principal: {AWS: '*'}
-          Resource: !GetAtt NewRequestQueue.Arn            
-          Sid: Allow-SNS-SendMessage
+          Resource: !GetAtt SaveToS3Queue.Arn
+        - Sid: Allow-SNS-To-SaveToDyanoQueue
+          Effect: Allow
+          Action: ['sqs:SendMessage']
+          Condition:
+            ArnEquals:
+              aws:SourceArn: !Ref NewRequestTopic
+          Principal: {AWS: '*'}
+          Resource: !GetAtt SaveToDynamoQueue.Arn
+          
         Version: '2008-10-17'
       Queues:
-      - !Ref NewRequestQueue
+      - !Ref SaveToS3Queue
+      - !Ref SaveToDynamoQueue
 
   #
   # ElastiCache
   #
-  RedisCluster:
-    Type: AWS::ElastiCache::ReplicationGroup
-    Properties:
-      AutoMinorVersionUpgrade: true      
-      CacheParameterGroupName: default.redis5.0.cluster.on
-      CacheNodeType: !Ref ElasticacheInstanceClass
-      CacheSubnetGroupName:  !Ref RedisSubnetGroup
-      Engine: redis
-      EngineVersion: 5.0.4
-      NumNodeGroups: 1
-      Port: 6379
-      ReplicasPerNodeGroup: 1
-      ReplicationGroupDescription: Redis group for scaling
-      SecurityGroupIds:
-        - !Ref RedisSecurityGroup
+  # RedisCluster:
+  #   Type: AWS::ElastiCache::ReplicationGroup
+  #   Properties:
+  #     AutoMinorVersionUpgrade: true      
+  #     CacheParameterGroupName: default.redis5.0.cluster.on
+  #     CacheNodeType: !Ref ElasticacheInstanceClass
+  #     CacheSubnetGroupName:  !Ref RedisSubnetGroup
+  #     Engine: redis
+  #     EngineVersion: 5.0.4
+  #     NumNodeGroups: 1
+  #     Port: 6379
+  #     ReplicasPerNodeGroup: 1
+  #     ReplicationGroupDescription: Redis group for scaling
+  #     SecurityGroupIds:
+  #       - !Ref RedisSecurityGroup
 
   RedisSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -337,41 +401,41 @@ Resources:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
 
-  NatGatewayAttachment:
-    Type: AWS::EC2::EIP
-    DependsOn: GatewayAttachement
-    Properties:
-      Domain: vpc
+  # NatGatewayAttachment:
+  #   Type: AWS::EC2::EIP
+  #   DependsOn: GatewayAttachement
+  #   Properties:
+  #     Domain: vpc
 
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGatewayAttachment.AllocationId
-      SubnetId: !Ref PublicSubnet1
+  # NatGateway:
+  #   Type: AWS::EC2::NatGateway
+  #   Properties:
+  #     AllocationId: !GetAtt NatGatewayAttachment.AllocationId
+  #     SubnetId: !Ref PublicSubnet1
 
-  PrivateRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
+  # PrivateRouteTable:
+  #   Type: AWS::EC2::RouteTable
+  #   Properties:
+  #     VpcId: !Ref VPC
 
-  PrivateRoute:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: "0.0.0.0/0"
-      NatGatewayId: !Ref NatGateway
+  # PrivateRoute:
+  #   Type: AWS::EC2::Route
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     DestinationCidrBlock: "0.0.0.0/0"
+  #     NatGatewayId: !Ref NatGateway
 
-  PrivateRouteTable1Association:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      SubnetId: !Ref PrivateSubnet1
+  # PrivateRouteTable1Association:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     SubnetId: !Ref PrivateSubnet1
 
-  PrivateRouteTable2Association:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      SubnetId: !Ref PrivateSubnet2
+  # PrivateRouteTable2Association:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     SubnetId: !Ref PrivateSubnet2
 
 Parameters:
   ProjectName:
